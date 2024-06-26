@@ -62,7 +62,7 @@ app.post("/api/users", (req, res) => {
 
   let user = new User({ username: username });
   user.save();
-
+  console.log(user);
   res.json(user);
 });
 
@@ -72,32 +72,69 @@ app.get("/api/users", async (req, res) => {
   res.json(allUsers);
 });
 
-app.post("/api/users/:id/exercises", (req, res) => {
+function formatDate(date) {
+  return `${date.getDay()} ${date.getDay()} ${date.getMonth()} ${date.getFullYear()}`
+}
+
+app.post("/api/users/:id/exercises", async (req, res) => {
   try {
-    let user = User.findById(req.params.id);
+    let user = await User.findById(req.params.id);
     let username = user.username;
     const description = req.body.description;
     const duration = req.body.duration;
-    let date = req.body.date;
-
-    if (date == undefined) {
+    let date = req.body.date
+    if (date === 'Invalid Date' || date === undefined) {
       date = new Date().toDateString();
+    } else {
+      new Date(req.body.date).toDateString();
     }
 
     let exercise = new Exercise({
-      username: username,
+      username: user.username,
       description: description,
       duration: duration,
       date: date,
     });
     exercise.save();
 
-    res.json(exercise);
+    const response = {
+      _id: user._id,
+      username: user.username,
+      description: exercise.description,
+      duration: exercise.duration,
+      date: date,
+    }
+    console.log(response)
+    res.json(response);
   } catch (err) {
-    console.error("User does not exist");
-    res.errored();
+    console.error("User does not exist, " + err);
+    res.status(500);
   }
 });
+
+app.get("/api/users/:id/logs", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const user = await User.findById(userId)
+    const exercises = await Exercise.find({ username: user.username });
+
+    let logArray = exercises.forEach(exercise => {
+      exercise.date = new Date(exercise.date).toDateString();
+    })
+
+    let response = {
+      ...user.toObject(),
+      count: exercises.length,
+      log: logArray
+    }
+    res.json(response)
+  } catch(err) {
+    console.error(err);
+    res.status(500);
+  }
+
+
+})
 
 const listener = app.listen(process.env.PORT || 3000, () => {
   console.log("Your app is listening on port " + listener.address().port);
